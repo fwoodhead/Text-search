@@ -1,0 +1,37 @@
+import glob, os, re
+from datetime import datetime
+import pandas as pd
+
+# Files are of format such as 2017.10.04.xlsx
+# create regex to search for files with format '201x.xx
+
+regex = re.compile('201\d.')
+frame = pd.DataFrame()
+list_ = []
+
+# set directory to search
+parent_dir = r"C:\Users\felix.woodhead\Documents\Clinics"
+
+# only searches xlsx files (ending .xls*)
+# re.match finds matches for regex in file names
+
+for xls_file in glob.glob(os.path.join(parent_dir, '*.xls*')):
+    
+    fFile=os.path.split(xls_file)[1]
+    if re.match(regex,fFile):
+    
+    # make datetime object from first 11 characters of file name
+    # adds column to df with clinic date
+    # don't forget to specify 'Sheet1'
+    
+        dtDate = datetime.strptime(fFile[:10], '%Y.%m.%d')
+        df=pd.read_excel(xls_file, sheetname='Sheet1')
+        df['ClinicDate']=dtDate
+        
+        list_.append(df)
+
+# merge files as dataframe
+frame = pd.concat(list_)
+
+# write to csv for manual cleanup
+frame.to_csv('ConcatClinic.csv', sep=',')
