@@ -1,0 +1,26 @@
+# Allows S number to be entered into code via GUI
+
+root = Tk()
+root.title("Glenfield ILD database")
+
+def printSnum(*args):
+    strNum = sNum.get()
+    print('Number is '+ strNum)
+
+mainframe = ttk.Frame(root, padding="3 3 12 12")
+mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
+mainframe.columnconfigure(0, weight=1)
+mainframe.rowconfigure(0, weight=1)
+
+sNum = StringVar()
+
+sNum_entry = ttk.Entry(mainframe, width=15, textvariable=sNum)
+sNum_entry.grid(column=2, row=1, sticky=(W, E))
+
+ttk.Label(mainframe, text = "Enter Hospital Number").grid(column=1, row=1, sticky=(E))
+ttk.Button(mainframe, text="Print", command=printSnum).grid(column=3, row=1, sticky=W)
+
+sNum_entry.focus()
+#root.bind('<Return>', printSnum)
+
+root.mainloop()
