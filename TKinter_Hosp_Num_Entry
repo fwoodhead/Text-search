@@ -1,26 +1,159 @@
-# Allows S number to be entered into code via GUI
+import sqlite3
+from tkinter import *
+from tkinter import ttk
+
+conn = sqlite3.connect('trialTest.db')
+c = conn.cursor()
 
 root = Tk()
 root.title("Glenfield ILD database")
 
-def printSnum(*args):
-    strNum = sNum.get()
-    print('Number is '+ strNum)
+sNum = StringVar()
+strID = StringVar()
+strFname = StringVar()
+strSname = StringVar()
+strDOB = StringVar()
+strPt = StringVar()
+strMDT = StringVar()
 
+def DateAsISO(strDate):
+    # parses date
+    # if calculated DOB wrong, change 20 to 19
+    from dateutil.parser import parse
+    from dateutil.relativedelta import relativedelta
+    import datetime
+    
+    dt = parse(strDate, dayfirst=True)
+    if dt.year > datetime.datetime.today().year:
+        dt = dt - relativedelta(years=100)
+    ISOdt = dt.strftime('%d/%m/%Y %H:%M')
+    return ISOdt
+
+def DateDisplay(ISOdate):
+    # simply removes last 6 characters
+    strDate = ISOdate[:-6]
+    return strDate
+
+def NewGILDno(lastGILDno):
+    # strip last four figures from old number
+    # convert to integer, add one and put back as zero-padded string
+    intNum = int(lastGILDno[-4:])
+    strNum = str((intNum +1)).zfill(4)
+    return 'GILDA' + strNum
+
+def AddPatient():
+    # get values from form
+    # ensure S number has capital 'S'
+    NstrFname = strFname.get()
+    NstrSname = strSname.get()
+    NstrDOB = strDOB.get()
+    NstrDOB = DateAsISO(NstrDOB)
+    strNum = sNum.get()
+    strNum = strNum.capitalize()
+    
+    if any(len(x) == 0 for x in [NstrFname,NstrSname,NstrDOB]):
+        print('At least one variable missing')
+        
+    else:
+        c.execute("SELECT GILDno FROM tblDemogID ORDER BY GILDno DESC LIMIT 1")
+        # c.fetchone()[0] needed to get first value from returned tuple
+        lastGILDno = c.fetchone()[0]
+        newGILDno = NewGILDno(lastGILDno)
+        c.execute("INSERT INTO tblDemogID \
+        ('GILDno','tblDemogIDsnum','tblDemogIDforename','tblDemogIDsurname','tblDemogIDdobISOtext')\
+        VALUES (?,?,?,?,?)", (newGILDno,strNum,NstrFname,NstrSname,NstrDOB))
+        conn.commit()
+        # insert MDT here
+        
+def MDTbyGILD(GILDno):
+   
+    t = (GILDno,)
+    c.execute(("SELECT tblMDTdateISOtext, tblMDToutcome FROM tblMDT WHERE GILDno = ?"),t)
+    data = c.fetchall()
+    strMDT = 'No MDT result in database'
+    if len(data) > 0:
+        strMDT=''
+        for i in data:
+            strMDT += '\n' + DateDisplay(DateAsISO(i[0]),) + '\n' + i[1] + '\n' 
+    ttk.Label(mainframe, text = strMDT, wraplength=750).grid(column=1, row=4, sticky=(E),columnspan = 4)
+    #print(strMDT)
+          
+        
+def RegLabel(strPt):
+    ttk.Label(mainframe, text = strPt).grid(column=4, row=1, sticky=(W))
+
+def setDemog():
+    #If not registered, generates Entry boxes for demographics
+    
+    # row 2 label and entry box, 'Forename'
+    ttk.Label(mainframe, text = "Forename").grid(column=1, row=2, sticky=(E))
+    Fname_entry = ttk.Entry(mainframe, width=15, textvariable=strFname)
+    Fname_entry.grid(column=2, row=2, sticky=(W, E))
+
+    # row 2 label and entry box, 'Surname'
+    ttk.Label(mainframe, text = "Surname").grid(column=3, row=2, sticky=(E))
+    Sname_entry = ttk.Entry(mainframe, width=15, textvariable=strSname)
+    Sname_entry.grid(column=4, row=2, sticky=(W, E))
+
+    # row 2 label and entry box, 'DOB'
+    ttk.Label(mainframe, text = "DOB").grid(column=5, row=2, sticky=(E))
+    DOB_entry = ttk.Entry(mainframe, width=15, textvariable=strDOB)
+    DOB_entry.grid(column=6, row=2, sticky=(W, E))
+    
+    # Button for registering patients
+    ttk.Button(mainframe, text="Add Patient", command=AddPatient).grid(column=4, row=3, sticky=W)
+
+
+def searchSnum(*args):
+    # get S number as string, must be set to tuple or loops through string as a list
+    strNum = sNum.get()
+    t = (strNum,)
+    
+    # selects all data for this patient
+    c.execute(("SELECT * FROM tblDemogID WHERE tblDemogIDsnum = ?"),t)
+    data = c.fetchall()
+    
+    if data:
+        # Patient 
+        strID = data[0][0]
+        strFname = data[0][2]
+        strSname = data[0][3]
+        strDOB = data[0][4]
+        # code to run if patient found
+        # eg display name etc
+        strPt = strID + ' : ' + strFname + ' '+ strSname + ', DOB ' + DateDisplay(strDOB)
+        # run code to display names etc and disable them
+        print(strDOB)
+        RegLabel(strPt)
+        ttk.Button(mainframe, text="Add Patient", command=MDTbyGILD(strID)).grid(column=1, row=3, sticky=W)
+        
+    else:
+        # code to run if patient not found
+        # eg add new patient
+        strPt = 'Not yet registered'
+        RegLabel(strPt)
+        setDemog()
+    
+
+
+# Sets up main window
 mainframe = ttk.Frame(root, padding="3 3 12 12")
 mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
 mainframe.columnconfigure(0, weight=1)
 mainframe.rowconfigure(0, weight=1)
 
-sNum = StringVar()
-
+# row 1 label and entry box
+ttk.Label(mainframe, text = "Enter Hospital Number").grid(column=1, row=1, sticky=(E))
 sNum_entry = ttk.Entry(mainframe, width=15, textvariable=sNum)
 sNum_entry.grid(column=2, row=1, sticky=(W, E))
 
-ttk.Label(mainframe, text = "Enter Hospital Number").grid(column=1, row=1, sticky=(E))
-ttk.Button(mainframe, text="Print", command=printSnum).grid(column=3, row=1, sticky=W)
+
+#ttk.Label(mainframe, text = strPt).grid(column=1, row=2, sticky=(E))
+ttk.Button(mainframe, text="Search", command=searchSnum).grid(column=3, row=1, sticky=W)
 
 sNum_entry.focus()
-#root.bind('<Return>', printSnum)
+root.bind('<Return>', searchSnum)
 
 root.mainloop()
+c.close()
+conn.close()
